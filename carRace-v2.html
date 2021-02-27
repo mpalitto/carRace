@@ -6,14 +6,14 @@
     body {
 
         margin: 0px;
-        background-image: url("http://localhost:8080/raceTrack.jpg");
+        background-image: url("raceTrack.jpg");
     }
     #track {
         position: relative;
         width:  727px;
         /*height: 365px;
         top: -15px;
-        background-image: url("http://localhost:8080/track.png");*/
+        background-image: url("track.png");*/
     }
 
 
@@ -48,7 +48,7 @@ var raceTrack = { // oggetto che rappresenta la pista da corsa
 
         console.log("starting game...");
         //load track's mask
-        this.trackIMG.src = "http://localhost:8080/track.png";
+        this.trackIMG.src = "track.png";
         let img = this.trackIMG;
         //document.body.insertBefore(this.canvas, document.body.childNodes[0]);
         // set canvas dimentions
@@ -221,7 +221,7 @@ function updateGameArea() {
 }
 
 function startGame() {
-    car = new MovingRectangle(15, 25, "blue", 225, 225, "http://localhost:8080/Ferrari.png");
+    car = new MovingRectangle(15, 25, "blue", 225, 225, "Ferrari.png");
     raceTrack.start();
 }
 
