@@ -54,7 +54,7 @@ var raceTrack = { // oggetto che rappresenta la pista da corsa
 
         console.log("starting game...");
         //load track's mask
-        this.trackIMG.src = "track.png";
+        this.trackIMG.src = "trackStartingLine.png";
         let img = this.trackIMG;
         //document.body.insertBefore(this.canvas, document.body.childNodes[0]);
         // set canvas dimentions
@@ -66,7 +66,7 @@ var raceTrack = { // oggetto che rappresenta la pista da corsa
         // set the 2d library/object to work with the canvas
         this.context = this.canvas.getContext("2d");
         this.ctxMask = this.track.getContext('2d');
-        this.context.globalAlpha = 0.7;
+        this.context.globalAlpha = 1.0;
         this.context.drawImage(img, this.maskOffset, this.maskOffset, img.width, img.height);
         this.ctxMask.drawImage(img, this.maskOffset, this.maskOffset, img.width, img.height);
 
@@ -86,8 +86,10 @@ var raceTrack = { // oggetto che rappresenta la pista da corsa
 
         //disegna il tracciato senza nessun veicolo
         //this.clear();
-        //aggiungi il rettangolo (veicolo) nella posizione iniziale        
+        //aggiungi il rettangolo (veicolo) nella posizione iniziale    
+        car.newPos();    
         car.update();
+        this.context.font = "30px Arial";
         console.log("game Started!");
 
     },
@@ -103,6 +105,9 @@ class MovingRectangle {
 
         this.width = width;
         this.height = height;
+        this.halfWidth = (this.width -2) / 2;
+        this.halfHeight = this.height / 2;
+
         this.speed = 0;
         this.angle = position.angle;
         this.moveAngle = 0;
@@ -132,6 +137,17 @@ class MovingRectangle {
         //verifica se la nuova posizione ha causato la collisione con ostacoli
         let collision = false;
         let data = [];
+        data = ctxMask.getImageData(this.corners.topLeft.x, this.corners.topLeft.y, 1, 1).data;
+
+        //  console.log(JSON.stringify(data));
+
+        if(JSON.stringify(data) == '{"0":0,"1":0,"2":255,"3":255}') {
+            if(! detection) {
+                if(counting) stopTimer();
+                else startTimer();
+                detection = true;
+            }
+        } else detection = false;
         for(let corner in this.corners) { 
             //prendi il punto della maschera del tracciato nel punto corrispondente all'angolo del rettangolo           
             data = ctxMask.getImageData(this.corners[corner].x, this.corners[corner].y, 1, 1).data;
@@ -189,10 +205,10 @@ class MovingRectangle {
         this.y -= this.speed * Math.cos(this.angle);
         //console.log('x: '+this.x+'   y: '+this.y+'   s: '+this.speed);
 
+        let halfWidth = this.halfWidth;
+        let halfHeight = this.halfHeight;
         //calcolo la nuova posizione degli angoli del rettangolo 
         //se considero x,y le coordinate del centro del rettangolo...
-        let halfWidth = this.width / 2;
-        let halfHeight = this.height / 2;
         let wx =  halfWidth * Math.cos(this.angle); //  x changes for rotation due to width 
         let hx = halfHeight * Math.sin(this.angle); //  x changes for rotation due to height
         let wy =  halfWidth * Math.sin(this.angle); //  y changes for rotation due to width
@@ -209,7 +225,30 @@ class MovingRectangle {
     }
 }
 
+let ticks = 0;
+let secs = 0;
+let mins = 0;
+let counting = false;
+let detection = false;
+
+function startTimer() {
+    if(! counting && ! detection) {
+        ticks = 0;
+        secs = 0;
+        mins = 0;
+        counting = true;
+        console.log("Timer Started!")
+    }
+}
+
+function stopTimer() { 
+    counting = false; 
+    console.log("Timer STOPPED!")
+    console.log("mins: "+mins+" secs: "+secs+"."+ticks * 2);
+}
+
 function updateGameArea() {
+
     //verify if user is pressing the direction keys in which case set the appropiate car attributes
     let moving = false;
     car.moveAngle = 0;
@@ -224,6 +263,15 @@ function updateGameArea() {
         car.newPos();
         car.update();
     }
+    if(counting) {
+        ticks++; 
+        if(ticks >= 20) {ticks = 0; secs++}
+        if(secs >= 60) {secs = 0; mins++}
+    }
+    raceTrack.context.fillStyle = "black";
+    raceTrack.context.fillRect(480, 0, 500, 30);
+    raceTrack.context.fillStyle = "white";
+    raceTrack.context.fillText("mins: "+mins+" secs: "+secs+"."+ticks * 2, 480, 20);
 }
 
 function startGame() {
