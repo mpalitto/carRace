@@ -7,6 +7,8 @@
 
         margin: 0px;
         background-image: url("raceTrack.jpg");
+        /*margin: 15px;
+        background-image: url("raceMaskCheckpoints.png");*/
     }
     #track {
         position: relative;
@@ -15,14 +17,40 @@
         top: -15px;
         background-image: url("track.png");*/
     }
+    #menu {
+        position: fixed;
+        top:  130px;
+        left: 150px;
+        background-color: black;
+        color: white;
+        display: grid;
+        grid-template-columns: 300px;
+        grid-template-rows: 50px 50px;
+        justify-items: center;
+        /*align-items: center;*/
+    }
 
+    #menu > * {
+        height: 30px;
+    }
 
-
+    #bestLap {
+        position: fixed;
+        top: 0px;
+        left: 0px;
+        background-color: red;
+        color: white;
+    }
 </style>
 </head>
 <body onload="startGame()">
 
 <div id="track"><canvas></canvas></div>
+<div id="bestLap">Best Lap [-:--.--]</div>
+<div id="menu">
+    <h4 id=messaggio>Gentelmen start your engine!</h4>
+    <div><button>PLAY</button></div>
+</div>
 
 <script>
 var car;
@@ -33,6 +61,8 @@ var raceTrack = { // oggetto che rappresenta la pista da corsa
     track: document.createElement('canvas'),    //crea un elemento che contiene il percorso/machera del tracciato
     trackIMG: document.createElement('img'), //l'immagine della maskera del tracciato
     maskOffset: -15,
+    checkPoints: ['{"0":0,"1":0,"2":255,"3":255}', '{"0":0,"1":255,"2":0,"3":255}', '{"0":255,"1":255,"2":0,"3":255}', '{"0":255,"1":0,"2":255,"3":255}', '{"0":0,"1":255,"2":255,"3":255}', '{"0":255,"1":153,"2":0,"3":255}','{"0":244,"1":204,"2":204,"3":255}'],
+    bestLap: [],
     startingPosition: [{x: 433.2228140993475, y: 115.20334469679268
 , angle: -1.2915436464758066}], // pole è elemento 0
     veicoli: [],
@@ -54,7 +84,7 @@ var raceTrack = { // oggetto che rappresenta la pista da corsa
 
         console.log("starting game...");
         //load track's mask
-        this.trackIMG.src = "trackStartingLine.png";
+        this.trackIMG.src = "raceMaskCheckpoints.png";
         let img = this.trackIMG;
         //document.body.insertBefore(this.canvas, document.body.childNodes[0]);
         // set canvas dimentions
@@ -105,17 +135,21 @@ class MovingRectangle {
 
         this.width = width;
         this.height = height;
-        this.halfWidth = (this.width -2) / 2;
+        this.halfWidth = (this.width - 4) / 2; // -4 per dare un pò di agio al veicolo
         this.halfHeight = this.height / 2;
 
-        this.speed = 0;
+        //position
         this.angle = position.angle;
-        this.moveAngle = 0;
         this.x = position.x;
-        this.y = position.y;   
+        this.y = position.y;  
+        this.rec = []; // memorizza la corsa per eventuale replay
+        //speed 
+        this.speed = 0;
+        this.carSpeed = 3;
+        this.moveAngle = 0;
+
         this.corners = {};
         this.color = color; 
-        this.carSpeed = 3;
         if(img) {
             this.img = document.createElement('img');
             this.img.src = img;
@@ -126,34 +160,69 @@ class MovingRectangle {
         }
     }
     
+    position2(position) {
+        this.angle = position.angle;
+        this.x = position.x;
+        this.y = position.y;   
+        //this.update();
+    }
     // aggiorna il rettangolo nel raceTrack (canvas) alla nuova posizione
     update() { 
         //console.log("updating car drawing");
         let ctx = raceTrack.context;
         let ctxMask = raceTrack.ctxMask;
         // inizia a tracciare i cerchi per mostrare le collisioni
-                    ctx.beginPath();
+        ctx.beginPath();
 
         //verifica se la nuova posizione ha causato la collisione con ostacoli
         let collision = false;
         let data = [];
-        data = ctxMask.getImageData(this.corners.topLeft.x, this.corners.topLeft.y, 1, 1).data;
+
+        //verifica se sta passando dal via
+        //se la l'angolo avanti a sinistra della macchina 
+        data = JSON.stringify(ctxMask.getImageData(this.corners.bottomLeft.x, this.corners.bottomLeft.y, 1, 1).data);
 
         //  console.log(JSON.stringify(data));
+        // se tocca un colore che non è il colore del tracciato
+        if(data != '{"0":207,"1":226,"2":243,"3":255}') {
+            //console.log("colore non del tracciato: "+data);
+        // se tocca il checkpoint che ci aspettiamo
+            if (data == raceTrack.checkPoints[check]) {
+                console.log("colore del checkpoint: "+check);
+                if(detection == false) { //se è la prima volta che tocca il checkpoint
+                    console.log("prima volta che vedo questo colore");
+                    if(check == 0) {
+                        console.log("vettura passata per il via!");
+                        //ferma o fai partire il cronometro
+                        if(counting) stopTimer();
+                        else startTimer();
+                    }
+                    console.log("Check Point: "+check);
+                    detection = true; //segnala che abbiamo toccato il checkpoint
+                } 
+            } else {// verifica che sia una altro checkpoint
+                //console.log("verifico che non sia un altro checkpoint...");
+                //if(! detection) { //se è la prima volta che tocca il checkpoint
+                    raceTrack.checkPoints.forEach(function(checkpoint, index) {
 
-        if(JSON.stringify(data) == '{"0":0,"1":0,"2":255,"3":255}') {
-            if(! detection) {
-                if(counting) stopTimer();
-                else startTimer();
-                detection = true;
+                        if (index >= check && data == checkpoint) gameOver();
+                    });
+                    //detection = true; //segnala che abbiamo toccato il checkpoint
+                //}
             }
-        } else detection = false;
+        } else
+            if(detection) {
+                check = nextCheck(); //aggiorna il check counter
+                detection = false; //non stiamo più pestando il checkpooint
+            }
+
+        //controlla se uno dei quattro angoli del rettangolo è in collisione
         for(let corner in this.corners) { 
-            //prendi il punto della maschera del tracciato nel punto corrispondente all'angolo del rettangolo           
-            data = ctxMask.getImageData(this.corners[corner].x, this.corners[corner].y, 1, 1).data;
+            //prendi il punto della maschera del tracciato nel puntocorrispondente all'angolo del rettangolo           
+            data = ctxMask.getImageData(this.corners[corner].x, this.corners[   corner].y, 1, 1).data;
             //ctx.drawImage(raceTrack.track,0,0);
             // verifica che non sia dentro il tracciato
-            if(JSON.stringify(data) != '{"0":207,"1":226,"2":243,"3":255}') {
+            if(JSON.stringify(data) == '{"0":237,"1":28,"2":36,"3":255}') {
                 ctx.fillStyle = "black";
                 ctx.arc(this.corners[corner].x, this.corners[corner].y, 2, 0, 6.28);
                 //console.log(JSON.stringify(data));
@@ -190,9 +259,24 @@ class MovingRectangle {
             ctx.drawImage(this.img, this.width / -2, this.height / -2, this.width, this.height);
         else
             ctx.fillRect(this.width / -2, this.height / -2, this.width, this.height);
+
         //una volta che il sistema di riferimento è ristabilito, il rettangolo risulterà nella nuposizione
         ctx.restore();
-        //---ctxMask.restore();      
+
+        if(bestLapRec && totTicks < bestLap.ticks) {
+            ctx.save(); // salviamo il ctx in modo che possiamo ritornare alle  coordinate di riferimeoriginali
+            //cambiamo le coordinate di riferimento così che il centro del  rettangolo risulti a coordina0,0)
+            ctx.translate(raceTrack.bestLap[totTicks].x, raceTrack.bestLap[totTicks].y); //usa (x, y) della nuova posizione
+            //ruotiamo il sistema di riferimento in modo che il rettangolo risulti  in piedi dritto
+            ctx.rotate(raceTrack.bestLap[totTicks].angle); //usa angolo della nuova posizione
+
+            //disegna l'onbra della macchina durante il giro più veloce
+            ctx.globalAlpha = 0.2;
+            ctx.fillRect(this.width / -2, this.height / -2, this.width, this.height);    
+            ctx.globalAlpha = 1.0;
+            //una volta che il sistema di riferimento è ristabilito, il rettangolo  risulterà nella nuposizione
+            ctx.restore();    
+        }
     }
 
     //aggiorna la posizione del rettangolo
@@ -225,13 +309,27 @@ class MovingRectangle {
     }
 }
 
+let totTicks = 0;
 let ticks = 0;
 let secs = 0;
 let mins = 0;
-let counting = false;
-let detection = false;
+let counting = false; // cronometro sta contando
+let detection = false; // sta passando per il via
+let lap = {};
+let bestLap = {display: "-:--.--", ticks: 12000};
+let bestLapRec = false;
+// checkpoint 0: start/end, 1-6: checkpoints intermedi
+let check = 0; //checkpoint number
 
+function nextCheck() {
+    return ++check % 7; //0 -> 6, 0
+}
+
+
+//avvio cronometro
 function startTimer() {
+    //avvia cronometro solo se non sta già cronometrando
+    //
     if(! counting && ! detection) {
         ticks = 0;
         secs = 0;
@@ -240,11 +338,32 @@ function startTimer() {
         console.log("Timer Started!")
     }
 }
-
+//STOP CRONOMETRO
 function stopTimer() { 
+    raceTrack.stop();
     counting = false; 
-    console.log("Timer STOPPED!")
-    console.log("mins: "+mins+" secs: "+secs+"."+ticks * 2);
+    //console.log("Timer STOPPED!")
+    lap = {display: ""+mins+":"+secs+"."+ticks * 2, ticks: totTicks};
+    //controlla se è il Best Lap
+    if(lap.ticks <  bestLap.ticks) { 
+        bestLap = lap; 
+        messaggio.innerHTML = "BEST LAP!!!"; 
+        giroVeloce.innerHTML= "Best Lap ["+mins+": "+secs+"."+ticks * 2+"]";
+        raceTrack.bestLap = car.rec; // memorizza il miglior giro per eventuale replay
+        delete car.rec; //rimuovi il vecchio nome per l'array
+        car.rec = []; //assegna array vuoto
+        bestLapRec = true;
+    }
+    else messaggio.innerHTML = "GAME OVER";
+
+    menu.style.display = "grid"; // mostra menu
+
+}
+
+function gameOver() {
+    totTicks = 20000;
+    stopTimer();
+    messaggio.innerHTML = "furbettto?! GAME OVER";
 }
 
 function updateGameArea() {
@@ -263,26 +382,46 @@ function updateGameArea() {
         car.newPos();
         car.update();
     }
+    //cronometro
     if(counting) {
+        car.rec.push({x: car.x, y: car.y, angle: car.angle});
+        totTicks++; 
         ticks++; 
-        if(ticks >= 20) {ticks = 0; secs++}
+        if(ticks >= 20) {ticks = 0; secs++}// 20 ticks per sec.
         if(secs >= 60) {secs = 0; mins++}
     }
+    //sfondo del cronometro
     raceTrack.context.fillStyle = "black";
-    raceTrack.context.fillRect(480, 0, 500, 30);
+    raceTrack.context.fillRect(450, 0, 300, 25);
+    //la faccia del cronometro
     raceTrack.context.fillStyle = "white";
-    raceTrack.context.fillText("mins: "+mins+" secs: "+secs+"."+ticks * 2, 480, 20);
+    raceTrack.context.fillText(""+mins+":"+secs+"."+ticks * 2, 450, 20);
 }
+let menu = document.querySelector("#menu");
+let messaggio = document.querySelector("#messaggio");
+let play = document.querySelector("button");
+let giroVeloce = document.querySelector("#bestLap");
 
 function startGame() {
+    play.addEventListener("click", function(){
+        totTicks = 0;
+        ticks = 0;
+        check = 0;
+        secs = 0;
+        mins = 0;
+        counting = false; // cronometro sta contando
+        detection = false; // sta passando per il via
+        car.position2(raceTrack.startingPosition[0]);
+        raceTrack.start();
+        menu.style.display = "none"; //nascondi il menu
+    });
     car = new MovingRectangle(15, 25, "blue", raceTrack.startingPosition[0], "Ferrari.png");
-    raceTrack.start();
+    
 }
 
 </script>
 
-<p>Make sure the gamearea has focus, and use the arrow keys to move the blue square around.</p>
-<p>If the square get red it means it is colliding with an obstacle</p>
+<p>Make sure the gamearea has focus, and use the arrow keys to move the car  around.</p>
 
 </body>
 </html>
